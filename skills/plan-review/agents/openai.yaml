@@ -1,0 +1,6 @@
+interface:
+  display_name: "Plan Review"
+  short_description: "Verify discovery before writing the plan"
+  default_prompt: "Use $plan-review to verify this feature's discovery against the workspace before specification."
+policy:
+  allow_implicit_invocation: false

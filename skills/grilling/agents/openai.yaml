@@ -1,3 +1,4 @@
 interface:
   display_name: "Grilling"
-  short_description: "Stress-test thinking one question at a time"
+  short_description: "Research first, then ask only real decisions"
+  default_prompt: "Use $grilling to research this feature, create its discovery notes, and ask only unresolved decisions."
