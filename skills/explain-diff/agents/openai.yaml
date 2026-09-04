@@ -1,0 +1,6 @@
+interface:
+  display_name: "Explain Diff"
+  short_description: "Explain a code change as a focused HTML guide"
+  default_prompt: "Use $explain-diff to explain this code change in a self-contained HTML guide."
+policy:
+  allow_implicit_invocation: false

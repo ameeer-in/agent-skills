@@ -1,5 +1,6 @@
 interface:
   display_name: "To Spec"
-  short_description: "Turn a conversation into a spec"
+  short_description: "Turn reviewed discovery into PLAN.md"
+  default_prompt: "Use $to-spec to turn the reviewed discovery into an implementation PLAN.md."
 policy:
   allow_implicit_invocation: false

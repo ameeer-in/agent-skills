@@ -1,5 +1,6 @@
 interface:
   display_name: "Implement"
-  short_description: "Build work from a spec or tickets"
+  short_description: "Implement, verify, review, and commit locally"
+  default_prompt: "Use $implement to complete this approved story, verify it, and leave a local commit without pushing."
 policy:
   allow_implicit_invocation: false

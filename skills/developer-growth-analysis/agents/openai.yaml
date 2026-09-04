@@ -1,0 +1,6 @@
+interface:
+  display_name: "Developer Growth Analysis"
+  short_description: "Find growth patterns in recent coding work"
+  default_prompt: "Use $developer-growth-analysis to review my recent coding-agent work and suggest two evidence-backed experiments."
+policy:
+  allow_implicit_invocation: false

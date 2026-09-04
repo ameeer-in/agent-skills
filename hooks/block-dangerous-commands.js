@@ -1,22 +1,14 @@
 #!/usr/bin/env node
 /**
  * Block Dangerous Commands - PreToolUse Hook for Bash
- * Blocks dangerous patterns before execution. Logs to: ~/.claude/hooks-logs/
+ * Blocks dangerous patterns before execution. Logs to: ~/.agent-skills/hooks-logs/
  *
  * SAFETY_LEVEL: 'critical' | 'high' | 'strict'
  *   critical - Only catastrophic: rm -rf ~, dd to disk, fork bombs
  *   high     - + risky: force push main, secrets exposure, git reset --hard
  *   strict   - + cautionary: any force push, sudo rm, docker prune
  *
- * Setup in .claude/settings.json:
- * {
- *   "hooks": {
- *     "PreToolUse": [{
- *       "matcher": "Bash",
- *       "hooks": [{ "type": "command", "command": "node /path/to/block-dangerous-commands.js" }]
- *     }]
- *   }
- * }
+ * Supports Claude Code and Codex. See hooks/README.md for setup.
  */
 
 const fs = require('fs');
@@ -26,19 +18,21 @@ const SAFETY_LEVEL = 'strict';
 
 const PATTERNS = [
   // CRITICAL - Catastrophic, unrecoverable
-  { level: 'critical', id: 'rm-home',          regex: /\brm\s+(-.+\s+)*["']?~\/?["']?(\s|$|[;&|])/,                        reason: 'rm targeting home directory' },
-  { level: 'critical', id: 'rm-home-var',      regex: /\brm\s+(-.+\s+)*["']?\$HOME["']?(\s|$|[;&|])/,                      reason: 'rm targeting $HOME' },
-  { level: 'critical', id: 'rm-home-trailing', regex: /\brm\s+.+\s+["']?(~\/?|\$HOME)["']?(\s*$|[;&|])/,                   reason: 'rm with trailing ~/ or $HOME' },
+  { level: 'critical', id: 'rm-home',          regex: /\brm\b(?:\s+-[^\s]+)*\s+(?:--\s+)?["']?(?:~|\$HOME|\$\{HOME\})(?:\/(?:\*|\.\*)?)?["']?(?=\s|$|[;&|])/, reason: 'rm targeting the home directory' },
   { level: 'critical', id: 'rm-root',          regex: /\brm\s+(-.+\s+)*\/(\*|\s|$|[;&|])/,                                 reason: 'rm targeting root filesystem' },
   { level: 'critical', id: 'rm-system',        regex: /\brm\s+(-.+\s+)*\/(etc|usr|var|bin|sbin|lib|boot|dev|proc|sys)(\/|\s|$)/, reason: 'rm targeting system directory' },
   { level: 'critical', id: 'rm-cwd',           regex: /\brm\s+(-.+\s+)*(\.\/?|\*|\.\/\*)(\s|$|[;&|])/,                     reason: 'rm deleting current directory contents' },
-  { level: 'critical', id: 'dd-disk',          regex: /\bdd\b.+of=\/dev\/(sd[a-z]|nvme|hd[a-z]|vd[a-z]|xvd[a-z])/,         reason: 'dd writing to disk device' },
-  { level: 'critical', id: 'mkfs',             regex: /\bmkfs(\.\w+)?\s+\/dev\/(sd[a-z]|nvme|hd[a-z]|vd[a-z])/,            reason: 'mkfs formatting disk' },
+  { level: 'critical', id: 'dd-disk',          regex: /\bdd\b[\s\S]*\bof=["']?\/dev\/(?:r?disk\d+|sd[a-z]\d*|nvme\d+n\d+(?:p\d+)?|hd[a-z]\d*|vd[a-z]\d*|xvd[a-z]\d*)\b/, reason: 'dd writing to a disk device' },
+  { level: 'critical', id: 'mkfs',             regex: /\bmkfs(?:\.\w+)?\b[\s\S]*\/dev\/(?:r?disk\d+|sd[a-z]\d*|nvme\d+n\d+(?:p\d+)?|hd[a-z]\d*|vd[a-z]\d*|xvd[a-z]\d*)\b/, reason: 'mkfs formatting a disk device' },
+  { level: 'critical', id: 'diskutil-erase',   regex: /\bdiskutil\s+(?:eraseDisk|eraseVolume|partitionDisk|zeroDisk|randomDisk|secureErase)\b/i, reason: 'diskutil destructive disk operation' },
   { level: 'critical', id: 'fork-bomb',        regex: /:\(\)\s*\{.*:\s*\|\s*:.*&/,                                         reason: 'fork bomb detected' },
 
   // HIGH - Significant risk, data loss, security
-  { level: 'high', id: 'curl-pipe-sh',   regex: /\b(curl|wget)\b.+\|\s*(ba)?sh\b/,                                        reason: 'piping URL to shell (RCE risk)' },
-  { level: 'high', id: 'git-force-main', regex: /\bgit\s+push\b(?!.+--force-with-lease).+(--force|-f)\b.+\b(main|master)\b/, reason: 'force push to main/master' },
+  { level: 'high', id: 'url-pipe-shell',  regex: /\b(?:curl|wget)\b[\s\S]*\|\s*(?:sudo\s+)?(?:(?:\/usr\/bin\/)?env\s+)?(?:\/(?:usr\/)?bin\/)?(?:bash|sh|zsh|dash|ksh|fish)\b/i, reason: 'piping a URL to a shell' },
+  { level: 'high', id: 'git-force-main', regex: /\bgit\s+push\b(?=[\s\S]*(?:--force(?:=true)?|-f)(?:\s|$))(?=[\s\S]*(?:\b(?:main|master)\b|refs\/heads\/(?:main|master)\b))/, reason: 'force push to main/master' },
+  { level: 'high', id: 'git-force-refspec-main', regex: /\bgit\s+push\b[\s\S]*\+(?:[^\s:]+:)?(?:refs\/heads\/)?(?:main|master)\b/, reason: 'force refspec targeting main/master' },
+  { level: 'high', id: 'git-delete-main', regex: /\bgit\s+push\b(?=[\s\S]*(?:--delete\b|:\s*(?:refs\/heads\/)?(?:main|master)\b))(?=[\s\S]*(?:\b(?:main|master)\b|refs\/heads\/(?:main|master)\b))/, reason: 'deleting main/master on a remote' },
+  { level: 'high', id: 'git-push-mirror', regex: /\bgit\s+push\b[\s\S]*--mirror\b/, reason: 'mirroring all refs to a remote' },
   { level: 'high', id: 'git-reset-hard', regex: /\bgit\s+reset\s+--hard/,                                                 reason: 'git reset --hard loses uncommitted work' },
   { level: 'high', id: 'git-clean-f',    regex: /\bgit\s+clean\s+(-\w*f|-f)/,                                             reason: 'git clean -f deletes untracked files' },
   { level: 'high', id: 'chmod-777',      regex: /\bchmod\b.+\b777\b/,                                                     reason: 'chmod 777 is a security risk' },
@@ -58,8 +52,7 @@ const PATTERNS = [
 ];
 
 const LEVELS = { critical: 1, high: 2, strict: 3 };
-const EMOJIS = { critical: '🚨', high: '⛔', strict: '⚠️' };
-const LOG_DIR = path.join(process.env.HOME, '.claude', 'hooks-logs');
+const LOG_DIR = path.join(process.env.HOME, '.agent-skills', 'hooks-logs');
 
 function log(data) {
   try {
@@ -93,12 +86,12 @@ async function main() {
 
     if (result.blocked) {
       const p = result.pattern;
-      log({ level: 'BLOCKED', id: p.id, priority: p.level, cmd, session_id, cwd, permission_mode });
+      log({ level: 'BLOCKED', id: p.id, priority: p.level, commandLength: cmd.length, session_id, cwd, permission_mode });
       return console.log(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: `${EMOJIS[p.level]} [${p.id}] ${p.reason}`
+          permissionDecisionReason: `[${p.id}] ${p.reason}`
         }
       }));
     }

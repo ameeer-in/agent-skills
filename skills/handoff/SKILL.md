@@ -1,15 +1,35 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document for another agent to pick up.
-argument-hint: "What will the next session be used for?"
+description: Compact current work into a small handoff that points a fresh agent to the feature plan, ticket frontier, repositories, commits, evidence, and unresolved decisions.
 ---
 
-Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the `plans/` folder under the current workspace if not present then ask user for location. Use Ticket Number if present in the conversation as file name with short description.
+# Handoff
 
-Include a "suggested skills" section in the document, which suggests skills that the agent should invoke.
+Write the handoff inside the existing `plans/<feature-slug>/` folder. Resolve the folder
+from the current conversation, assigned ticket, and workspace conventions; ask only if
+multiple existing feature folders are equally plausible.
 
-Do not duplicate content already captured in other artifacts (plans, issues, commits, diffs). Reference them by path or URL instead.
+Read the feature artifacts and relevant git state before writing. Do not duplicate the
+contents of `DISCOVERY.md`, `REVIEW.md`, `PLAN.md`, tickets, `PRS.md`, commits, or diffs.
+Link to them with repository-relative paths.
 
-Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
+Include:
 
-If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.
+```markdown
+# <Feature> — Handoff
+
+## Goal and current stage
+## Source-of-truth artifacts
+## Repository, branch, and commit state
+## Completed work and verification
+## Ready ticket frontier
+## Blockers and unresolved decisions
+## Exact next action
+## Suggested skills
+```
+
+If arguments were passed, make the exact next action serve that next session. Record
+whether anything was pushed or a PR exists; never infer either from a local branch.
+
+Redact secrets, personal data, customer data, and private URLs. Append a concise dated
+`Handoff` entry to the feature `CHANGELOG.md`.

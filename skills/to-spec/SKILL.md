@@ -1,73 +1,83 @@
 ---
 name: to-spec
-description: Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.
-disable-model-invocation: true
+description: Turn reviewed feature discovery into a repository-grounded PLAN.md inside the workspace plans folder. Use after plan-review when the user wants an implementation contract, not more interviews or issue publication.
 ---
 
-This skill takes the current conversation context and codebase understanding and produces a spec (you may know this document as a PRD). Do NOT interview the user — just synthesize what you already know.
+# To Spec
 
-## Process
+Produce the implementation contract at `plans/<feature-slug>/PLAN.md`. Do not publish
+issues, modify production code, or restart discovery as an interview.
 
-1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the spec, and respect any ADRs in the area you're touching.
+## Preconditions
 
-2. Sketch out the seams at which you're going to test the feature. Existing seams should be preferred to new ones. Use the highest seam possible. If new seams are needed, propose them at the highest point you can. The fewer seams across the codebase, the better - the ideal number is one.
+Read, in order:
 
-Check with the user that these seams match their expectations.
+1. workspace-root and relevant repository `AGENTS.md` files when present, including
+   relevant paths and delegated instruction files they reference;
+2. all existing artifacts in the feature folder;
+3. the current code and tests at the contracts named by `DISCOVERY.md` and `REVIEW.md`.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+If `REVIEW.md` has unresolved blockers, stop and report them. Otherwise resolve small
+factual gaps from the repositories yourself. Ask the user only when an unmade decision
+would materially change the contract.
 
-<spec-template>
+When discovery and review disagree, an evidence-backed correction in `REVIEW.md`
+overrides the earlier discovery claim. Carry both the correction and its evidence into
+the plan; do not silently preserve the contradicted statement.
 
-## Problem Statement
+## Write the plan
 
-The problem that the user is facing, from the user's perspective.
+Use concrete repository-relative paths and existing symbols where that makes the plan
+executable. Unlike long-lived product requirements, this document is an engineering
+contract for the current checkout; precise locations are useful when verified.
 
-## Solution
+```markdown
+# <Feature> — Implementation Plan
 
-The solution to the problem, from the user's perspective.
+**Status:** draft | approved | blocked
+**Updated:** YYYY-MM-DD
 
-## User Stories
+## Objective and observable outcome
+## Current behavior and evidence
+## Scope
+## Out of scope
+## Repository impact and ownership
+| Repository | Contract owned | Required change | Dependency | Verification |
+## Functional and technical decisions
+## Interfaces, data, and compatibility
+## Failure behavior and safety constraints
+## Verification strategy
+## Delivery order and review gates
+## Rollout and rollback
+## Risks and remaining assumptions
+## Completion conditions
+```
 
-A LONG, numbered list of user stories. Each user story should be in the format of:
+The plan must distinguish proven behavior, chosen decisions, and remaining assumptions.
+Prefer existing test seams and repository conventions. Include exact commands only when
+verified; otherwise describe the verification outcome required.
 
-1. As an <actor>, I want a <feature>, so that <benefit>
+Do not split the plan into tickets here. The delivery order may identify candidate
+slices, but `to-tickets` owns their final boundaries and dependency graph.
 
-<user-story-example>
-1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
-</user-story-example>
+## Maintain the feature ledger
 
-This list of user stories should be extremely extensive and cover all aspects of the feature.
+Create `PRS.md` if absent:
 
-## Implementation Decisions
+```markdown
+# <Feature> — Delivery Ledger
 
-A list of implementation decisions that were made. This can include:
+| Story | Owner | Repository | Base | Work branch | Local commits | Review | PR | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+```
 
-- The modules that will be built/modified
-- The interfaces of those modules that will be modified
-- Technical clarifications from the developer
-- Architectural decisions
-- Schema changes
-- API contracts
-- Specific interactions
+Use one row per story and repository. A story that crosses three repositories has three
+rows because its branches, commits, reviews, and eventual PRs can move independently.
+Use `not started`, `not committed`, and `not opened` rather than blanks. A PR URL must
+never be implied before one exists.
 
-Do NOT include specific file paths or code snippets. They may end up being outdated very quickly.
+Append a dated `Specification` entry to `CHANGELOG.md` with the plan status, major
+scope decisions, and files changed in the feature folder. Preserve previous history.
 
-Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it within the relevant decision and note briefly that it came from a prototype. Trim to the decision-rich parts — not a working demo, just the important bits.
-
-## Testing Decisions
-
-A list of testing decisions that were made. Include:
-
-- A description of what makes a good test (only test external behavior, not implementation details)
-- Which modules will be tested
-- Prior art for the tests (i.e. similar types of tests in the codebase)
-
-## Out of Scope
-
-A description of the things that are out of scope for this spec.
-
-## Further Notes
-
-Any further notes about the feature.
-
-</spec-template>
+End with the exact plan path and whether it is ready for user approval. Do not invoke
+`to-tickets` until the plan is approved.
